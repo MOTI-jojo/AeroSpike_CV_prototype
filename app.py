@@ -297,7 +297,9 @@ try:
         volleyball_3d(time_arr, x, y, z, idx_max_v)
         
         st.markdown("<br>", unsafe_allow_html=True)
-        fig_speed = plot_speed_2d(time_arr, speed_kmh, t)
+        # Отрезаем данные после первого касания пола, чтобы график скорости не показывал резкий скачок отскока
+        end_idx = landing_idx[0] + 1 if len(landing_idx) > 0 else len(time_arr)
+        fig_speed = plot_speed_2d(time_arr[:end_idx], speed_kmh[:end_idx], t)
         st.plotly_chart(fig_speed, use_container_width=True, theme="streamlit")
         
         import pandas as pd

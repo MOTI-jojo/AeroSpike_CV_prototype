@@ -162,7 +162,7 @@ def sync_num(key):
 init_state("v0", 90.0) # 90 km/h is a good default (25 m/s)
 init_state("alpha", 10.0)
 init_state("y0", 2.5)
-init_state("spin", 600.0)
+init_state("spin", 800.0)
 init_state("mass", 0.27)
 init_state("cd", 0.40)
 # ------------------------------------------------------ #
@@ -199,8 +199,8 @@ with main_col:
     if serve_type == ServeType.TOPSPIN:
         st.markdown(t["spin"])
         c1, c2 = st.columns([3, 1])
-        c1.slider("spin_s", 0.0, 1000.0, key="spin_slider", on_change=sync_slider, args=("spin",), label_visibility="collapsed")
-        c2.number_input("spin_n", 0.0, 1000.0, key="spin_num", on_change=sync_num, args=("spin",), label_visibility="collapsed")
+        c1.slider("spin_s", 0.0, 1500.0, key="spin_slider", on_change=sync_slider, args=("spin",), label_visibility="collapsed")
+        c2.number_input("spin_n", 0.0, 1500.0, key="spin_num", on_change=sync_num, args=("spin",), label_visibility="collapsed")
         current_spin = st.session_state.spin_num
     else:
         current_spin = 0.0

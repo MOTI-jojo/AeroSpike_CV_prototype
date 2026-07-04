@@ -6,12 +6,17 @@ Math Model 3D - Volleyball Flight Simulation
 import streamlit as st
 import numpy as np
 import base64
+import io
 from src.input_handler import SimulationParams, ServeType
 from src.physics import solve_trajectory_3d, calculate_impact_force
-from src.visualization import plot_trajectory_3d, plot_speed_2d
+from src.visualization import (
+    plot_trajectory_3d, plot_speed_2d, plot_monte_carlo,
+    plot_monte_carlo_heatmap, plot_energy_diagram,
+    plot_comparison_3d, plot_reception_zones
+)
 from src.analyzer import evaluate_serve
 from src.i18n import TEXT
-from src.config import BALL_MODELS
+from src.config import BALL_MODELS, PRO_PRESETS
 
 # Select language via session state or default to Russian
 if "lang" not in st.session_state:
@@ -168,6 +173,8 @@ init_state("start_z", 0.0)
 init_state("start_z", 0.0)
 init_state("spin", 800.0)
 init_state("spin_angle", 0.0)
+init_state("wind_speed", 0.0)
+init_state("wind_dir", 0.0)
 if "ball_type" not in st.session_state:
     st.session_state.ball_type = "MIKASA_V200W"
 init_state("mass", BALL_MODELS["MIKASA_V200W"].mass)
@@ -180,10 +187,37 @@ main_col, viz_col = st.columns([1, 2], gap="large")
 with main_col:
     st.markdown(t["params"])
     
+    # ---- Пресеты профессионалов ---- #
+    st.markdown("### 🏆 Пресеты подач профессионалов")
+    preset_names = {k: f"{v.name}" for k, v in PRO_PRESETS.items()}
+    preset_choice = st.selectbox("Выбрать пресет", ["—"] + list(preset_names.values()), key="preset_select", label_visibility="collapsed")
+    
+    if preset_choice != "—":
+        for key, preset in PRO_PRESETS.items():
+            if preset.name == preset_choice:
+                st.caption(f"_{preset.description}_")
+                if st.button(f"⚡ Применить: {preset.name}", key=f"apply_{key}"):
+                    st.session_state.v0_num = preset.v0_kmh
+                    st.session_state.v0_slider = preset.v0_kmh
+                    st.session_state.alpha_num = preset.alpha_deg
+                    st.session_state.alpha_slider = preset.alpha_deg
+                    st.session_state.azimuth_num = preset.azimuth_deg
+                    st.session_state.azimuth_slider = preset.azimuth_deg
+                    st.session_state.y0_num = preset.y0
+                    st.session_state.y0_slider = preset.y0
+                    st.session_state.spin_num = preset.spin_rpm
+                    st.session_state.spin_slider = preset.spin_rpm
+                    st.session_state.spin_angle_num = preset.spin_angle_deg
+                    st.session_state.spin_angle_slider = preset.spin_angle_deg
+                    st.rerun()
+                break
+    
+    st.markdown("---")
+    
     serve_type_str = st.selectbox(t["serve_type"], [t["serve_topspin"], t["serve_float"]])
     serve_type = ServeType.TOPSPIN if t["serve_topspin"] == serve_type_str else ServeType.FLOAT
     
-    st.markdown("Модель мяча") # Add translations later if needed
+    st.markdown("Модель мяча")
     ball_options = list(BALL_MODELS.keys())
     ball_type = st.selectbox("Мяч", ball_options, index=ball_options.index(st.session_state.ball_type), label_visibility="collapsed")
     
@@ -242,6 +276,18 @@ with main_col:
     c1.slider("spin_angle_s", -45.0, 45.0, key="spin_angle_slider", on_change=sync_slider, args=("spin_angle",), label_visibility="collapsed")
     c2.number_input("spin_angle_n", -45.0, 45.0, key="spin_angle_num", on_change=sync_num, args=("spin_angle",), label_visibility="collapsed")
     current_spin_angle = st.session_state.spin_angle_num
+    
+    # Ветер
+    with st.expander("🌬️ Ветер"):
+        st.markdown("**Скорость ветра (м/с)**")
+        c1, c2 = st.columns([3, 1])
+        c1.slider("wind_speed_s", 0.0, 15.0, key="wind_speed_slider", on_change=sync_slider, args=("wind_speed",), label_visibility="collapsed")
+        c2.number_input("wind_speed_n", 0.0, 15.0, key="wind_speed_num", on_change=sync_num, args=("wind_speed",), label_visibility="collapsed")
+        
+        st.markdown("**Направление ветра (°)** — 0=встречный, 90=боковой, 180=попутный")
+        c1, c2 = st.columns([3, 1])
+        c1.slider("wind_dir_s", 0.0, 360.0, key="wind_dir_slider", on_change=sync_slider, args=("wind_dir",), label_visibility="collapsed")
+        c2.number_input("wind_dir_n", 0.0, 360.0, key="wind_dir_num", on_change=sync_num, args=("wind_dir",), label_visibility="collapsed")
         
     with st.expander(t["additional"]):
         st.markdown(t["mass"])
@@ -266,7 +312,9 @@ params = SimulationParams(
     serve_type=serve_type,
     spin_rpm=current_spin,
     spin_angle_deg=current_spin_angle,
-    cd=st.session_state.cd_num
+    cd=st.session_state.cd_num,
+    wind_speed=st.session_state.wind_speed_num,
+    wind_direction_deg=st.session_state.wind_dir_num
 )
 
 try:
@@ -279,9 +327,9 @@ try:
     
     impact_force = calculate_impact_force(st.session_state.v0_num / 3.6, st.session_state.mass_num)
     # Find actual landing point (first time it hits the ground)
-    landing_idx = __import__('numpy').where(y <= 0.15)[0]
+    landing_idx = np.where(y <= 0.15)[0]
     distance = x[landing_idx[0]] if len(landing_idx) > 0 else x[-1]
-    flight_time = time_arr[-1]
+    flight_time = time_arr[landing_idx[0]] if len(landing_idx) > 0 else time_arr[-1]
     max_height = max(y)
     
     with viz_col:
@@ -296,11 +344,25 @@ try:
         st.plotly_chart(fig, use_container_width=True, theme="streamlit")
         
         st.markdown("<br>", unsafe_allow_html=True)
-        # Отрезаем данные после первого касания пола, чтобы график скорости не показывал резкий скачок отскока
+        # Отрезаем данные после первого касания пола
         end_idx = landing_idx[0] + 1 if len(landing_idx) > 0 else len(time_arr)
-        fig_speed = plot_speed_2d(time_arr[:end_idx], speed_kmh[:end_idx], t)
-        st.plotly_chart(fig_speed, use_container_width=True, theme="streamlit")
         
+        # Табы с графиками
+        tab_speed, tab_energy = st.tabs(["📈 График скорости", "⚡ Диаграмма энергии"])
+        
+        with tab_speed:
+            fig_speed = plot_speed_2d(time_arr[:end_idx], speed_kmh[:end_idx], t)
+            st.plotly_chart(fig_speed, use_container_width=True, theme="streamlit")
+        
+        with tab_energy:
+            fig_energy = plot_energy_diagram(
+                time_arr[:end_idx], y[:end_idx], 
+                vx[:end_idx], vy[:end_idx], vz[:end_idx], 
+                st.session_state.mass_num
+            )
+            st.plotly_chart(fig_energy, use_container_width=True, theme="streamlit")
+        
+        # CSV export
         import pandas as pd
         df = pd.DataFrame({"Time(s)": time_arr, "X(m)": x, "Y_Height(m)": y, "Z_Width(m)": z, "Speed(km/h)": speed_kmh})
         csv = df.to_csv(index=False).encode('utf-8')
@@ -317,26 +379,34 @@ try:
             else:
                 st.warning(f"**{res['param']}**: {res['comment']}")
                 
-        # Продвинутая аналитика (Этап 2)
-        st.markdown("### Цифровой тренер (Продвинутая аналитика)")
-        tab_mc, tab_opt = st.tabs(["Монте-Карло (Стабильность)", "Поиск оптимальной подачи"])
+        # ==================== ЦИФРОВОЙ ТРЕНЕР ==================== #
+        st.markdown("### 🎯 Цифровой тренер (Продвинутая аналитика)")
+        tab_mc, tab_opt, tab_compare, tab_reception, tab_reverse = st.tabs([
+            "🎲 Монте-Карло", "🔍 Поиск подачи", "⚔️ Сравнение", "🛡️ Зона приёма", "🔄 Обратная задача"
+        ])
         
+        # --- Монте-Карло --- #
         with tab_mc:
-            st.write("Симуляция 30 подач со случайными отклонениями (±5% скорости, ±2° угла). Позволяет оценить процент успешного попадания при неидеальном исполнении.")
+            st.write("Симуляция 50 подач со случайными отклонениями (±5% скорости, ±2° угла).")
             if st.button("Запустить симуляцию Монте-Карло"):
                 from src.analyzer import run_monte_carlo
-                from src.visualization import plot_monte_carlo
                 with st.spinner("Симуляция..."):
-                    success_rate, points = run_monte_carlo(params, n=30)
+                    success_rate, points = run_monte_carlo(params, n=50)
                     st.metric("Вероятность попадания (Success Rate)", f"{success_rate:.1f}%")
-                    fig_mc = plot_monte_carlo(points)
-                    st.plotly_chart(fig_mc, use_container_width=True, theme="streamlit")
+                    mc_tab1, mc_tab2 = st.tabs(["Точки падения", "Тепловая карта"])
+                    with mc_tab1:
+                        fig_mc = plot_monte_carlo(points)
+                        st.plotly_chart(fig_mc, use_container_width=True, theme="streamlit")
+                    with mc_tab2:
+                        fig_hm = plot_monte_carlo_heatmap(points)
+                        st.plotly_chart(fig_hm, use_container_width=True, theme="streamlit")
                     
+        # --- Оптимизатор подачи --- #
         with tab_opt:
-            st.write("Укажите желаемую точку падения мяча на стороне противника, и алгоритм подберет идеальную скорость и угол.")
+            st.write("Укажите желаемую точку падения мяча, и алгоритм подберёт идеальные параметры.")
             opt_c1, opt_c2 = st.columns(2)
             target_x = opt_c1.number_input("Целевой X (длина, 9-18м)", min_value=9.0, max_value=18.0, value=17.0, step=0.5)
-            target_z = opt_c2.number_input("Целевой Z (ширина, от -4.5 до 4.5м)", min_value=-4.5, max_value=4.5, value=4.0, step=0.5)
+            target_z = opt_c2.number_input("Целевой Z (ширина, -4.5 до 4.5м)", min_value=-4.5, max_value=4.5, value=0.0, step=0.5)
             
             if st.button("Найти параметры"):
                 from src.analyzer import optimize_serve
@@ -347,19 +417,122 @@ try:
                         st.write(f"**Скорость:** {opt_res['v0']*3.6:.1f} км/ч")
                         st.write(f"**Вертикальный угол:** {opt_res['alpha_deg']:.1f}°")
                         st.write(f"**Горизонтальный азимут:** {opt_res['azimuth_deg']:.1f}°")
-                        
-                        # Apply button
-                        if st.button("Применить эти параметры"):
-                            st.session_state.v0_num = opt_res['v0'] * 3.6
-                            st.session_state.v0_slider = opt_res['v0'] * 3.6
-                            st.session_state.alpha_num = opt_res['alpha_deg']
-                            st.session_state.alpha_slider = opt_res['alpha_deg']
-                            st.session_state.azimuth_num = opt_res['azimuth_deg']
-                            st.session_state.azimuth_slider = opt_res['azimuth_deg']
-                            st.rerun()
                     else:
-                        st.error("Не удалось найти стабильное решение для заданной точки с текущими параметрами высоты и вращения. Попробуйте изменить точку или базовые настройки.")
+                        st.error("Не удалось найти решение. Попробуйте изменить точку.")
+
+        # --- Сравнение двух подач --- #
+        with tab_compare:
+            st.write("Задайте параметры второй подачи для сравнения с текущей.")
+            cmp_c1, cmp_c2, cmp_c3 = st.columns(3)
+            cmp_v0 = cmp_c1.number_input("Скорость 2 (км/ч)", 30.0, 150.0, 80.0, key="cmp_v0")
+            cmp_alpha = cmp_c2.number_input("Угол 2 (°)", -15.0, 45.0, 15.0, key="cmp_alpha")
+            cmp_azimuth = cmp_c3.number_input("Азимут 2 (°)", -30.0, 30.0, -5.0, key="cmp_azimuth")
+            
+            if st.button("Сравнить траектории"):
+                params2 = params.copy()
+                params2.v0 = cmp_v0 / 3.6
+                params2.alpha_deg = cmp_alpha
+                params2.azimuth_deg = cmp_azimuth
+                
+                t2, x2, y2, z2, vx2, vy2, vz2 = solve_trajectory_3d(params2)
+                v2_kmh = ((vx2**2 + vy2**2 + vz2**2)**0.5) * 3.6
+                
+                label1 = f"Текущая ({st.session_state.v0_num:.0f} км/ч)"
+                label2 = f"Вторая ({cmp_v0:.0f} км/ч)"
+                
+                fig_cmp = plot_comparison_3d(x, y, z, speed_kmh, x2, y2, z2, v2_kmh, label1, label2, t)
+                st.plotly_chart(fig_cmp, use_container_width=True, theme="streamlit")
+        
+        # --- Зона приёма --- #
+        with tab_reception:
+            st.write("Позиции защитников и анализ, кто из них успеет добежать до точки падения мяча.")
+            from src.analyzer import calculate_reception_zones
+            reception_data = calculate_reception_zones(x, y, z, time_arr)
+            
+            if "error" not in reception_data:
+                fig_rec = plot_reception_zones(reception_data)
+                st.plotly_chart(fig_rec, use_container_width=True, theme="streamlit")
+                
+                for d in reception_data["defenders"]:
+                    status = "✅" if d["can_reach"] else "❌"
+                    st.write(f"{status} **{d['name']}**: расстояние до мяча {d['distance']:.1f}м, "
+                             f"время на реакцию {d['time_available']:.2f}с")
+            else:
+                st.warning("Мяч не касается пола — невозможно определить зону приёма.")
+        
+        # --- Обратная задача --- #
+        with tab_reverse:
+            st.write("Задайте точку приёма и желаемую скорость прилёта. Алгоритм подберёт, откуда и как подавать.")
+            rev_c1, rev_c2, rev_c3 = st.columns(3)
+            rev_x = rev_c1.number_input("Точка X (9-18м)", 9.0, 18.0, 15.0, step=0.5, key="rev_x")
+            rev_z = rev_c2.number_input("Точка Z (-4.5 до 4.5м)", -4.5, 4.5, 0.0, step=0.5, key="rev_z")
+            rev_speed = rev_c3.number_input("Скорость прилёта (км/ч, 0=любая)", 0.0, 100.0, 0.0, step=5.0, key="rev_speed")
+            
+            if st.button("Решить обратную задачу"):
+                from src.analyzer import reverse_solve
+                with st.spinner("Решаю обратную задачу..."):
+                    target_spd = rev_speed if rev_speed > 0 else None
+                    rev_res = reverse_solve(params, rev_x, rev_z, target_spd)
+                    if rev_res["success"]:
+                        st.success("Решение найдено!")
+                        st.write(f"**Скорость подачи:** {rev_res['v0_kmh']:.1f} км/ч")
+                        st.write(f"**Вертикальный угол:** {rev_res['alpha_deg']:.1f}°")
+                        st.write(f"**Горизонтальный азимут:** {rev_res['azimuth_deg']:.1f}°")
+                        st.write(f"_Погрешность: {rev_res['dist_error']:.2f}м_")
+                    else:
+                        st.error("Не удалось найти решение для заданных условий.")
+
+        # ==================== PDF ОТЧЁТ ==================== #
+        st.markdown("### 📄 Экспорт отчёта")
+        if st.button("Сгенерировать PDF-отчёт"):
+            try:
+                from reportlab.lib.pagesizes import A4
+                from reportlab.pdfgen import canvas
+                from reportlab.lib.units import cm
+                
+                buf = io.BytesIO()
+                c = canvas.Canvas(buf, pagesize=A4)
+                w, h = A4
+                
+                c.setFont("Helvetica-Bold", 20)
+                c.drawString(2*cm, h - 2*cm, "Volleyball Serve Analysis Report")
+                
+                c.setFont("Helvetica", 12)
+                y_pos = h - 3.5*cm
+                lines = [
+                    f"Serve Type: {serve_type.value}",
+                    f"Ball: {st.session_state.ball_type}",
+                    f"Speed: {st.session_state.v0_num:.1f} km/h ({st.session_state.v0_num/3.6:.1f} m/s)",
+                    f"Vertical Angle: {st.session_state.alpha_num:.1f} deg",
+                    f"Azimuth: {st.session_state.azimuth_num:.1f} deg",
+                    f"Height: {st.session_state.y0_num:.2f} m",
+                    f"Spin: {current_spin:.0f} RPM, Axis tilt: {current_spin_angle:.1f} deg",
+                    f"Wind: {st.session_state.wind_speed_num:.1f} m/s @ {st.session_state.wind_dir_num:.0f} deg",
+                    "",
+                    "--- RESULTS ---",
+                    f"Distance: {distance:.2f} m",
+                    f"Max Height: {max_height:.2f} m",
+                    f"Flight Time: {flight_time:.2f} s",
+                    f"Impact Force: {impact_force:.1f} N",
+                    "",
+                    "--- ANALYTICS ---",
+                ]
+                for res in analysis_results:
+                    lines.append(f"[{res['status'].upper()}] {res['param']}: {res['comment']}")
+                
+                for line in lines:
+                    c.drawString(2*cm, y_pos, line)
+                    y_pos -= 0.6*cm
+                    if y_pos < 2*cm:
+                        c.showPage()
+                        c.setFont("Helvetica", 12)
+                        y_pos = h - 2*cm
+                
+                c.save()
+                buf.seek(0)
+                st.download_button("📥 Скачать PDF", buf.getvalue(), "serve_report.pdf", "application/pdf")
+            except ImportError:
+                st.warning("Для PDF-отчёта нужна библиотека `reportlab`. Добавьте `reportlab` в requirements.txt.")
 
 except Exception as e:
     st.error(f"{t['error']} {e}")
-

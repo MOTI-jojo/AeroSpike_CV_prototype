@@ -42,8 +42,22 @@ def solve_trajectory_3d(params: SimulationParams) -> Tuple[np.ndarray, np.ndarra
         
         if v_mag == 0:
             return np.array([vx, vy, vz, 0.0, -G, 0.0])
-            
-        f_drag = -0.5 * RHO * cd_ball * a_ball * v_mag * v_vec
+        
+        # Ветер: вычисляем скорость мяча относительно воздуха
+        wind_rad = math.radians(params.wind_direction_deg)
+        wind_vec = np.array([
+            params.wind_speed * math.cos(wind_rad),
+            0.0,
+            params.wind_speed * math.sin(wind_rad)
+        ])
+        v_rel = v_vec - wind_vec  # скорость относительно воздуха
+        v_rel_mag = np.linalg.norm(v_rel)
+        
+        if v_rel_mag == 0:
+            f_drag = np.array([0.0, 0.0, 0.0])
+        else:
+            f_drag = -0.5 * RHO * cd_ball * a_ball * v_rel_mag * v_rel
+        
         f_magnus = np.array([0.0, 0.0, 0.0])
         f_karman = np.array([0.0, 0.0, 0.0])
         
@@ -51,21 +65,21 @@ def solve_trajectory_3d(params: SimulationParams) -> Tuple[np.ndarray, np.ndarra
         curr_omega = omega_rad * math.exp(-SPIN_DECAY_RATE * t)
         omega_vec = np.array([0.0, -curr_omega * math.sin(gamma), -curr_omega * math.cos(gamma)])
         
-        if curr_omega > 0:
-            S_factor = (r_ball * curr_omega) / v_mag if v_mag > 0 else 0
+        if curr_omega > 0 and v_rel_mag > 0:
+            S_factor = (r_ball * curr_omega) / v_rel_mag
             cl_actual = CL_DEFAULT * S_factor
             omega_cross_v = np.cross(omega_vec, v_vec)
             norm_cross = np.linalg.norm(omega_cross_v)
             if norm_cross > 0:
                 dir_magnus = omega_cross_v / norm_cross
-                f_magnus = 0.5 * RHO * cl_actual * a_ball * (v_mag**2) * dir_magnus
+                f_magnus = 0.5 * RHO * cl_actual * a_ball * (v_rel_mag**2) * dir_magnus
                 
         if params.serve_type == ServeType.FLOAT:
-            freq = (STROUHAL_NUMBER * v_mag / d_ball) * 0.15
+            freq = (STROUHAL_NUMBER * v_rel_mag / d_ball) * 0.15
             cl_z = 0.25 * math.sin(2 * math.pi * freq * t + phi_z)
             cl_y = 0.15 * math.sin(2 * math.pi * freq * t + phi_y)
-            f_karman_z = 0.5 * RHO * cl_z * a_ball * (v_mag**2)
-            f_karman_y = 0.5 * RHO * cl_y * a_ball * (v_mag**2)
+            f_karman_z = 0.5 * RHO * cl_z * a_ball * (v_rel_mag**2)
+            f_karman_y = 0.5 * RHO * cl_y * a_ball * (v_rel_mag**2)
             f_karman = np.array([0.0, f_karman_y, f_karman_z])
             
         f_lateral = f_magnus + f_karman

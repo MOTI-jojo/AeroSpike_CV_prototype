@@ -26,3 +26,7 @@ class SimulationParams(BaseModel):
     
     # Drag config (optional manual override)
     cd: float = Field(default=0.4, ge=0, description="Drag coefficient")
+    
+    # Wind
+    wind_speed: float = Field(default=0.0, ge=0, description="Wind speed in m/s")
+    wind_direction_deg: float = Field(default=0.0, description="Wind direction: 0=headwind(+x), 90=crosswind(+z), 180=tailwind(-x)")

@@ -8,7 +8,7 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
-dist
+# dist - removed so we can commit build output for Streamlit Cloud
 dist-ssr
 *.local
 

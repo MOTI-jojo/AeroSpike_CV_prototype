@@ -62,11 +62,17 @@ def evaluate_serve(x: np.ndarray, y: np.ndarray, z: np.ndarray, time_arr: np.nda
                 results.append({"status": "success", "param": t["an_drift_param"], "comment": t["an_drift_good"]})
         
         if serve_type == ServeType.TOPSPIN:
-            # Evaluate Magnus effectiveness by comparing max height to initial height
-            max_h = np.max(y)
-            if max_h < y[0] * 1.1:
-                results.append({"status": "success", "param": t["an_magnus_param"], "comment": t["an_magnus_strong"]})
-            else:
-                results.append({"status": "warning", "param": t["an_magnus_param"], "comment": t["an_magnus_weak"]})
+            # Evaluate Magnus effectiveness by looking at the final drop angle (steepness of the dive)
+            # A strong topspin will cause the ball to dive sharply at the end.
+            if len(time_arr) >= 2:
+                v_y_final = (y[-1] - y[-2]) / (time_arr[-1] - time_arr[-2])
+                v_x_final = (x[-1] - x[-2]) / (time_arr[-1] - time_arr[-2])
+                drop_ratio = abs(v_y_final / v_x_final) if v_x_final != 0 else 1.0
+                
+                # A drop_ratio > 0.6 corresponds to a drop angle of > ~31 degrees, which is steep for a spike serve
+                if drop_ratio > 0.6:
+                    results.append({"status": "success", "param": t["an_magnus_param"], "comment": t["an_magnus_strong"]})
+                else:
+                    results.append({"status": "warning", "param": t["an_magnus_param"], "comment": t["an_magnus_weak"]})
                 
     return results

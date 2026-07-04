@@ -1,5 +1,5 @@
 """
-Physical constants and default configurations for Math_Model_3D.
+Physical constants and default configurations for AeroSpike_CV_prototype.
 """
 import math
 from dataclasses import dataclass

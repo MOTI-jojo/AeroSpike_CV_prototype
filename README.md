@@ -29,8 +29,8 @@
 ### Способ 1. Локальный запуск (Mac / Linux / Windows)
 ```bash
 # Клонируем проект
-git clone https://github.com/MOTI-jojo/Math_Model_3D.git
-cd Math_Model_3D
+git clone https://github.com/MOTI-jojo/AeroSpike_CV_prototype.git
+cd AeroSpike_CV_prototype
 
 # Создаем виртуальное окружение и ставим зависимости
 make install

@@ -8,3 +8,5 @@ pytest>=7.0.0
 ruff>=0.0.200
 reportlab>=4.0.0
 pandas>=2.0.0
+vk_api>=11.9.9
+kaleido>=0.2.1

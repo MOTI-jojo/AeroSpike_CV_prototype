@@ -18,7 +18,8 @@ class SimulationParams(BaseModel):
     
     # Serve specifics
     serve_type: ServeType = Field(default=ServeType.TOPSPIN, description="Type of serve")
-    spin_rpm: float = Field(default=600.0, ge=0, description="Spin rate in RPM (mostly for topspin)")
+    spin_rpm: float = Field(default=800.0, ge=0, description="Spin rate in RPM (mostly for topspin)")
+    spin_angle_deg: float = Field(default=0.0, description="Tilt of the spin axis in degrees (-45 to 45)")
     
     # Drag config (optional manual override)
     cd: float = Field(default=0.4, ge=0, description="Drag coefficient")

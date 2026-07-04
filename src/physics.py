@@ -23,9 +23,12 @@ def solve_trajectory_3d(params: SimulationParams) -> Tuple[np.ndarray, np.ndarra
     # Angular velocity (for topspin)
     # Convert RPM to rad/s
     omega_rad = params.spin_rpm * 2 * math.pi / 60.0
-    # Topspin implies rotation around Z axis. Right hand rule: forward is +X, up is +Y.
-    # Topspin means top of ball moves +X, so rotation is negative around Z.
-    omega_vec = np.array([0.0, 0.0, -omega_rad])
+    
+    # Tilt of the spin axis (side-spin effect)
+    # gamma = 0 means pure topspin (rotation around -Z axis)
+    # gamma != 0 introduces rotation around Y axis, generating lateral Magnus force (Z axis)
+    gamma = math.radians(params.spin_angle_deg)
+    omega_vec = np.array([0.0, -omega_rad * math.sin(gamma), -omega_rad * math.cos(gamma)])
     
     # Random phase offsets for Karman vortex oscillations (float serve)
     phi_z = random.uniform(0, 2 * math.pi)

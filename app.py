@@ -163,6 +163,7 @@ init_state("v0", 90.0) # 90 km/h is a good default (25 m/s)
 init_state("alpha", 10.0)
 init_state("y0", 2.5)
 init_state("spin", 800.0)
+init_state("spin_angle", 0.0)
 init_state("mass", 0.27)
 init_state("cd", 0.40)
 # ------------------------------------------------------ #
@@ -202,8 +203,15 @@ with main_col:
         c1.slider("spin_s", 0.0, 1500.0, key="spin_slider", on_change=sync_slider, args=("spin",), label_visibility="collapsed")
         c2.number_input("spin_n", 0.0, 1500.0, key="spin_num", on_change=sync_num, args=("spin",), label_visibility="collapsed")
         current_spin = st.session_state.spin_num
+        
+        st.markdown(t["spin_angle"])
+        c1, c2 = st.columns([3, 1])
+        c1.slider("spin_angle_s", -45.0, 45.0, key="spin_angle_slider", on_change=sync_slider, args=("spin_angle",), label_visibility="collapsed")
+        c2.number_input("spin_angle_n", -45.0, 45.0, key="spin_angle_num", on_change=sync_num, args=("spin_angle",), label_visibility="collapsed")
+        current_spin_angle = st.session_state.spin_angle_num
     else:
         current_spin = 0.0
+        current_spin_angle = 0.0
         
     with st.expander(t["additional"]):
         st.markdown(t["mass"])
@@ -224,6 +232,7 @@ params = SimulationParams(
     y0=st.session_state.y0_num,
     serve_type=serve_type,
     spin_rpm=current_spin,
+    spin_angle_deg=current_spin_angle,
     cd=st.session_state.cd_num
 )
 

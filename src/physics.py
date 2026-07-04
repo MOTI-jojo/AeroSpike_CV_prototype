@@ -12,13 +12,19 @@ def solve_trajectory_3d(params: SimulationParams) -> Tuple[np.ndarray, np.ndarra
     Solves the 3D trajectory of the volleyball using scipy.integrate.solve_ivp.
     Returns (t, x, y, z, vx, vy, vz) arrays.
     """
-    # Initial state
-    v0_x = params.v0 * math.cos(math.radians(params.alpha_deg))
-    v0_y = params.v0 * math.sin(math.radians(params.alpha_deg))
-    v0_z = 0.0
+    # Decompose initial velocity into 3 components:
+    # alpha_deg = vertical angle (elevation)
+    # azimuth_deg = horizontal aim angle (0 = straight, pos = right, neg = left)
+    alpha_rad = math.radians(params.alpha_deg)
+    azimuth_rad = math.radians(params.azimuth_deg)
+    
+    v_horizontal = params.v0 * math.cos(alpha_rad)
+    v0_x = v_horizontal * math.cos(azimuth_rad)
+    v0_y = params.v0 * math.sin(alpha_rad)
+    v0_z = v_horizontal * math.sin(azimuth_rad)
     
     # State vector: [x, y, z, vx, vy, vz]
-    initial_state = [0.0, params.y0, 0.0, v0_x, v0_y, v0_z]
+    initial_state = [0.0, params.y0, params.start_z, v0_x, v0_y, v0_z]
     
     # Angular velocity (for topspin)
     # Convert RPM to rad/s

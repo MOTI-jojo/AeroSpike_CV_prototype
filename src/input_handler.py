@@ -14,7 +14,9 @@ class SimulationParams(BaseModel):
     # Initial conditions
     v0: float = Field(default=20.0, gt=0, description="Initial velocity module (m/s)")
     alpha_deg: float = Field(default=15.0, description="Launch angle in degrees (vertical)")
+    azimuth_deg: float = Field(default=0.0, description="Horizontal aim angle (0=straight, neg=left, pos=right)")
     y0: float = Field(default=2.5, ge=0, description="Initial height (m)")
+    start_z: float = Field(default=0.0, description="Lateral start position along baseline (m)")
     
     # Serve specifics
     serve_type: ServeType = Field(default=ServeType.TOPSPIN, description="Type of serve")

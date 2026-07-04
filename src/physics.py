@@ -12,13 +12,19 @@ def solve_trajectory_3d(params: SimulationParams) -> Tuple[np.ndarray, np.ndarra
     Solves the 3D trajectory of the volleyball using scipy.integrate.solve_ivp.
     Returns (t, x, y, z, vx, vy, vz) arrays.
     """
-    # Initial velocity decomposition (vertical plane only)
-    v0_x = params.v0 * math.cos(math.radians(params.alpha_deg))
-    v0_y = params.v0 * math.sin(math.radians(params.alpha_deg))
-    v0_z = 0.0
+    # Decompose initial velocity into 3 components:
+    # alpha_deg = vertical angle (elevation)
+    # azimuth_deg = horizontal aim angle (0 = straight, pos = right, neg = left)
+    alpha_rad = math.radians(params.alpha_deg)
+    azimuth_rad = math.radians(params.azimuth_deg)
+    
+    v_horizontal = params.v0 * math.cos(alpha_rad)
+    v0_x = v_horizontal * math.cos(azimuth_rad)
+    v0_y = params.v0 * math.sin(alpha_rad)
+    v0_z = v_horizontal * math.sin(azimuth_rad)
     
     # State vector: [x, y, z, vx, vy, vz]
-    initial_state = [0.0, params.y0, 0.0, v0_x, v0_y, v0_z]
+    initial_state = [0.0, params.y0, params.start_z, v0_x, v0_y, v0_z]
     
     # Angular velocity (for topspin)
     # Convert RPM to rad/s
@@ -47,35 +53,29 @@ def solve_trajectory_3d(params: SimulationParams) -> Tuple[np.ndarray, np.ndarra
         f_drag = -0.5 * RHO * params.cd * A_BALL * v_mag * v_vec
         
         # Lateral/Lift Force
-        f_lateral = np.array([0.0, 0.0, 0.0])
+        f_magnus = np.array([0.0, 0.0, 0.0])
+        f_karman = np.array([0.0, 0.0, 0.0])
         
-        if params.serve_type == ServeType.TOPSPIN and omega_rad > 0:
-            # Magnus Force
-            # F_magnus = 0.5 * rho * Cl * A * v_mag^2 * (omega x v) / (|omega| * |v|)
-            # Cl is roughly proportional to spin factor S = R * omega / v
+        # 1. Magnus Force (applies to ANY serve if there is spin)
+        if omega_rad > 0:
             S_factor = (R_BALL * omega_rad) / v_mag if v_mag > 0 else 0
             cl_actual = CL_DEFAULT * S_factor # simplified relation
-            
             omega_cross_v = np.cross(omega_vec, v_vec)
             norm_cross = np.linalg.norm(omega_cross_v)
             if norm_cross > 0:
                 dir_magnus = omega_cross_v / norm_cross
-                f_lateral = 0.5 * RHO * cl_actual * A_BALL * (v_mag**2) * dir_magnus
+                f_magnus = 0.5 * RHO * cl_actual * A_BALL * (v_mag**2) * dir_magnus
                 
-        elif params.serve_type == ServeType.FLOAT:
-            # Knuckleball effect (Macroscopic float effect due to seams)
-            # A pure Strouhal vortex shedding gives ~20+ Hz which cancels out in accurate RK45 integration.
-            # Real volleyball float shift is low-frequency (1-3 Hz) due to seam asymmetric boundary layer tripping.
-            # We scale the frequency down and increase amplitude to match realistic visible wobbles (like V3 aliasing did).
+        # 2. Karman vortex street (applies only to FLOAT serve)
+        if params.serve_type == ServeType.FLOAT:
             freq = (STROUHAL_NUMBER * v_mag / D_BALL) * 0.15 # ~2-3 Hz
-            
-            # Oscillating forces with random phases
             cl_z = 0.25 * math.sin(2 * math.pi * freq * t + phi_z)
             cl_y = 0.15 * math.sin(2 * math.pi * freq * t + phi_y)
+            f_karman_z = 0.5 * RHO * cl_z * A_BALL * (v_mag**2)
+            f_karman_y = 0.5 * RHO * cl_y * A_BALL * (v_mag**2)
+            f_karman = np.array([0.0, f_karman_y, f_karman_z])
             
-            f_z = 0.5 * RHO * cl_z * A_BALL * (v_mag**2)
-            f_y = 0.5 * RHO * cl_y * A_BALL * (v_mag**2)
-            f_lateral = np.array([0.0, f_y, f_z])
+        f_lateral = f_magnus + f_karman
             
         # Total Force
         f_total = f_drag + f_lateral

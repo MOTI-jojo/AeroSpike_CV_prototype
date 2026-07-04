@@ -161,7 +161,9 @@ def sync_num(key):
 # Init defaults
 init_state("v0", 90.0) # 90 km/h is a good default (25 m/s)
 init_state("alpha", 10.0)
+init_state("azimuth", 0.0)
 init_state("y0", 2.5)
+init_state("start_z", 0.0)
 init_state("spin", 800.0)
 init_state("spin_angle", 0.0)
 init_state("mass", 0.27)
@@ -191,28 +193,38 @@ with main_col:
     c1.slider("alpha_s", -15.0, 45.0, key="alpha_slider", on_change=sync_slider, args=("alpha",), label_visibility="collapsed")
     c2.number_input("alpha_n", -15.0, 45.0, key="alpha_num", on_change=sync_num, args=("alpha",), label_visibility="collapsed")
     
+    # Направление подачи (горизонтальный азимут)
+    st.markdown(t["azimuth"])
+    c1, c2 = st.columns([3, 1])
+    c1.slider("azimuth_s", -30.0, 30.0, key="azimuth_slider", on_change=sync_slider, args=("azimuth",), label_visibility="collapsed")
+    c2.number_input("azimuth_n", -30.0, 30.0, key="azimuth_num", on_change=sync_num, args=("azimuth",), label_visibility="collapsed")
+    
     # Высота
     st.markdown(t["y0"])
     c1, c2 = st.columns([3, 1])
     c1.slider("y0_s", 1.0, 4.0, key="y0_slider", on_change=sync_slider, args=("y0",), label_visibility="collapsed")
     c2.number_input("y0_n", 1.0, 4.0, key="y0_num", on_change=sync_num, args=("y0",), label_visibility="collapsed")
     
-    if serve_type == ServeType.TOPSPIN:
-        st.markdown(t["spin"])
-        c1, c2 = st.columns([3, 1])
-        c1.slider("spin_s", 0.0, 1500.0, key="spin_slider", on_change=sync_slider, args=("spin",), label_visibility="collapsed")
-        c2.number_input("spin_n", 0.0, 1500.0, key="spin_num", on_change=sync_num, args=("spin",), label_visibility="collapsed")
-        current_spin = st.session_state.spin_num
-        
-        st.markdown(t["spin_angle"])
-        c1, c2 = st.columns([3, 1])
-        c1.slider("spin_angle_s", -45.0, 45.0, key="spin_angle_slider", on_change=sync_slider, args=("spin_angle",), label_visibility="collapsed")
-        c2.number_input("spin_angle_n", -45.0, 45.0, key="spin_angle_num", on_change=sync_num, args=("spin_angle",), label_visibility="collapsed")
-        current_spin_angle = st.session_state.spin_angle_num
-    else:
+    # Позиция подающего
+    st.markdown(t["start_z"])
+    c1, c2 = st.columns([3, 1])
+    c1.slider("start_z_s", -4.5, 4.5, key="start_z_slider", on_change=sync_slider, args=("start_z",), label_visibility="collapsed")
+    c2.number_input("start_z_n", -4.5, 4.5, key="start_z_num", on_change=sync_num, args=("start_z",), label_visibility="collapsed")
+    
+    if serve_type == ServeType.FLOAT:
         st.info(t["float_tip"])
-        current_spin = 0.0
-        current_spin_angle = 0.0
+        
+    st.markdown(t["spin"])
+    c1, c2 = st.columns([3, 1])
+    c1.slider("spin_s", 0.0, 1500.0, key="spin_slider", on_change=sync_slider, args=("spin",), label_visibility="collapsed")
+    c2.number_input("spin_n", 0.0, 1500.0, key="spin_num", on_change=sync_num, args=("spin",), label_visibility="collapsed")
+    current_spin = st.session_state.spin_num
+    
+    st.markdown(t["spin_angle"])
+    c1, c2 = st.columns([3, 1])
+    c1.slider("spin_angle_s", -45.0, 45.0, key="spin_angle_slider", on_change=sync_slider, args=("spin_angle",), label_visibility="collapsed")
+    c2.number_input("spin_angle_n", -45.0, 45.0, key="spin_angle_num", on_change=sync_num, args=("spin_angle",), label_visibility="collapsed")
+    current_spin_angle = st.session_state.spin_angle_num
         
     with st.expander(t["additional"]):
         st.markdown(t["mass"])
@@ -230,7 +242,9 @@ params = SimulationParams(
     mass=st.session_state.mass_num,
     v0=st.session_state.v0_num / 3.6,
     alpha_deg=st.session_state.alpha_num,
+    azimuth_deg=st.session_state.azimuth_num,
     y0=st.session_state.y0_num,
+    start_z=st.session_state.start_z_num,
     serve_type=serve_type,
     spin_rpm=current_spin,
     spin_angle_deg=current_spin_angle,

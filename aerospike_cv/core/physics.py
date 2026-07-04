@@ -5,7 +5,7 @@ from scipy.integrate import solve_ivp
 from typing import Tuple
 
 from .config import G, RHO, CL_DEFAULT, STROUHAL_NUMBER, BALL_MODELS, SPIN_DECAY_RATE, RESTITUTION_COEF_FLOOR, RESTITUTION_COEF_NET
-from .input_handler import SimulationParams, ServeType
+from .models import SimulationParams, ServeType
 
 def solve_trajectory_3d(params: SimulationParams) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """

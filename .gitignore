@@ -16,3 +16,4 @@ __pycache__/
 # IDEs
 .idea/
 .vscode/
+.github/

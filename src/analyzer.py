@@ -32,8 +32,16 @@ def evaluate_serve(x: np.ndarray, y: np.ndarray, z: np.ndarray, time_arr: np.nda
         results.append({"status": "error", "param": t["an_net_param"], "comment": t["an_net_short"]})
         
     # 2. Out of Bounds (Landing zone)
-    final_x = x[-1]
-    final_z = z[-1]
+    landing_idx = np.where(y <= 0.15)[0]
+    if len(landing_idx) > 0:
+        first_land = landing_idx[0]
+        final_x = x[first_land]
+        final_z = z[first_land]
+        flight_time = time_arr[first_land]
+    else:
+        final_x = x[-1]
+        final_z = z[-1]
+        flight_time = time_arr[-1]
     
     if crossed_net:
         if final_x > 18.0:
@@ -47,7 +55,6 @@ def evaluate_serve(x: np.ndarray, y: np.ndarray, z: np.ndarray, time_arr: np.nda
             
     # 3. Flight Time / Reaction Speed
     if crossed_net and not hit_net and final_x <= 18.0 and abs(final_z) <= 4.5:
-        flight_time = time_arr[-1]
         if flight_time < 1.2:
             results.append({"status": "success", "param": t["an_time_param"], "comment": t["an_time_fast"]})
         elif flight_time > 1.5:
@@ -103,8 +110,14 @@ def run_monte_carlo(params, n=30) -> Tuple[float, List[Tuple[float, float, bool]
         if len(idx_net) > 0 and y[idx_net[0]] > 2.43:
             crossed_net = True
             
-        final_x = x[-1]
-        final_z = z[-1]
+        landing_idx = np.where(y <= 0.15)[0]
+        if len(landing_idx) > 0:
+            first_land = landing_idx[0]
+            final_x = x[first_land]
+            final_z = z[first_land]
+        else:
+            final_x = x[-1]
+            final_z = z[-1]
         
         is_success = crossed_net and (9.0 < final_x <= 18.0) and (abs(final_z) <= 4.5)
         
@@ -136,8 +149,14 @@ def optimize_serve(base_params, target_x: float, target_z: float) -> dict:
         if azimuth < -30 or azimuth > 30: return 1000.0
         
         t, x, y, z, vx, vy, vz = solve_trajectory_3d(p)
-        final_x = x[-1]
-        final_z = z[-1]
+        landing_idx = np.where(y <= 0.15)[0]
+        if len(landing_idx) > 0:
+            first_land = landing_idx[0]
+            final_x = x[first_land]
+            final_z = z[first_land]
+        else:
+            final_x = x[-1]
+            final_z = z[-1]
         
         dist = ((final_x - target_x)**2 + (final_z - target_z)**2)**0.5
         

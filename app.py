@@ -279,7 +279,9 @@ try:
     idx_max_v = int(np.argmax(speed_kmh))
     
     impact_force = calculate_impact_force(st.session_state.v0_num / 3.6, st.session_state.mass_num)
-    distance = x[-1]
+    # Find actual landing point (first time it hits the ground)
+    landing_idx = __import__('numpy').where(y <= 0.15)[0]
+    distance = x[landing_idx[0]] if len(landing_idx) > 0 else x[-1]
     flight_time = time_arr[-1]
     max_height = max(y)
     

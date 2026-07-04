@@ -12,7 +12,7 @@ if not _RELEASE:
     )
 else:
     parent_dir = os.path.dirname(os.path.abspath(__file__))
-    build_dir = os.path.join(parent_dir, "..", "frontend", "dist")
+    build_dir = os.path.abspath(os.path.join(parent_dir, "..", "frontend", "dist"))
     _component_func = components.declare_component("volleyball_3d", path=build_dir)
 
 def volleyball_3d(t, x, y, z, idx_max_v=0, key=None):

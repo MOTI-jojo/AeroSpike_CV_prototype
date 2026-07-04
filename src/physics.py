@@ -80,14 +80,10 @@ def solve_trajectory_3d(params: SimulationParams) -> Tuple[np.ndarray, np.ndarra
     hit_ground.terminal = True
     hit_ground.direction = -1
 
-    def hit_net(t, state):
-        x, y = state[0], state[1]
-        # Net is at x=9.0. If y < 2.43 (top of the net), it hits.
-        if y < 2.43 + r_ball:
-            return 9.0 - (x + r_ball) # Front of ball hits net
-        return 1.0 # No collision
-    hit_net.terminal = True
-    hit_net.direction = -1
+    def pass_net(t, state):
+        return 9.0 - (state[0] + r_ball) # Tracks passing the net plane
+    pass_net.terminal = True
+    pass_net.direction = -1
     
     t_start = 0.0
     t_end = 10.0
@@ -105,7 +101,7 @@ def solve_trajectory_3d(params: SimulationParams) -> Tuple[np.ndarray, np.ndarra
             t_span=(t_start, t_end),
             y0=current_state,
             method='RK45',
-            events=[hit_ground, hit_net],
+            events=[hit_ground, pass_net],
             dense_output=True,
             max_step=0.01
         )
@@ -122,27 +118,28 @@ def solve_trajectory_3d(params: SimulationParams) -> Tuple[np.ndarray, np.ndarra
         if sol.status == 1: # A termination event occurred
             event_idx = -1
             for i, ev_t in enumerate(sol.t_events):
-                if len(ev_t) > 0:
+                if len(ev_t) > 0 and ev_t[0] == sol.t[-1]:
                     event_idx = i
                     break
             
             if event_idx == 0:
                 # Hit ground
                 current_state = sol.y[:, -1].copy()
-                current_state[1] = r_ball # Correct position to exactly on ground
-                # Reverse y velocity and apply restitution
+                current_state[1] = r_ball + 0.001
                 current_state[4] = -current_state[4] * RESTITUTION_COEF_FLOOR
-                current_state[3] *= RESTITUTION_COEF_FLOOR # friction
-                current_state[5] *= RESTITUTION_COEF_FLOOR
+                current_state[3] *= 0.7 
+                current_state[5] *= 0.7
                 
             elif event_idx == 1:
                 # Hit net
                 current_state = sol.y[:, -1].copy()
-                current_state[0] = 9.0 - r_ball # correct position
-                # Reverse x velocity (bounce off net back) and reduce greatly
-                current_state[3] = -current_state[3] * RESTITUTION_COEF_NET
-                current_state[4] *= 0.5 # loses vertical energy too
-                current_state[5] *= RESTITUTION_COEF_NET
+                if current_state[1] < 2.43 + r_ball:
+                    current_state[0] = 9.0 - r_ball - 0.001
+                    current_state[3] = -current_state[3] * RESTITUTION_COEF_NET
+                    current_state[4] *= 0.5
+                    current_state[5] *= RESTITUTION_COEF_NET
+                else:
+                    current_state[0] += 0.005
                 
             t_start = sol.t[-1]
             bounces += 1

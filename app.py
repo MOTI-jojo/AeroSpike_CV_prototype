@@ -109,11 +109,11 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# CSS для кнопки языка и сброс отступов
+# CSS для кнопки языка (узкий селектор, чтобы не ломать другие колонки)
 st.markdown("""
 <style>
-    /* Выравнивание кнопки языка вправо */
-    div[data-testid="column"]:nth-of-type(2) {
+    /* Выравнивание кнопки языка вправо (только в header-контейнере) */
+    [data-testid="stHorizontalBlock"]:first-of-type > div[data-testid="column"]:last-child {
         display: flex;
         justify-content: flex-end;
         align-items: center;
@@ -164,7 +164,6 @@ init_state("alpha", 10.0)
 init_state("y0", 2.5)
 init_state("spin", 600.0)
 init_state("mass", 0.27)
-init_state("diameter", 0.21)
 init_state("cd", 0.40)
 # ------------------------------------------------------ #
 
@@ -218,27 +217,15 @@ with main_col:
         c2.number_input("cd_n", 0.0, 1.0, key="cd_num", on_change=sync_num, args=("cd",), label_visibility="collapsed")
 
 # Build params
-try:
-    params = SimulationParams(
-        mass=st.session_state.mass_num,
-        diameter=st.session_state.diameter_num, 
-        v0=st.session_state.v0_num / 3.6, # Convert km/h to m/s for physics engine
-        alpha_deg=st.session_state.alpha_num,
-        y0=st.session_state.y0_num,
-        serve_type=serve_type,
-        spin_rpm=current_spin,
-        cd=st.session_state.cd_num
-    )
-except Exception:
-    params = SimulationParams(
-        mass=st.session_state.mass_num,
-        v0=st.session_state.v0_num / 3.6,
-        alpha_deg=st.session_state.alpha_num,
-        y0=st.session_state.y0_num,
-        serve_type=serve_type,
-        spin_rpm=current_spin,
-        cd=st.session_state.cd_num
-    )
+params = SimulationParams(
+    mass=st.session_state.mass_num,
+    v0=st.session_state.v0_num / 3.6, # Convert km/h to m/s for physics engine
+    alpha_deg=st.session_state.alpha_num,
+    y0=st.session_state.y0_num,
+    serve_type=serve_type,
+    spin_rpm=current_spin,
+    cd=st.session_state.cd_num
+)
 
 try:
     time_arr, x, y, z, vx, vy, vz = solve_trajectory_3d(params)

@@ -1,4 +1,5 @@
 import math
+import random
 import numpy as np
 from scipy.integrate import solve_ivp
 from typing import Tuple
@@ -25,6 +26,10 @@ def solve_trajectory_3d(params: SimulationParams) -> Tuple[np.ndarray, np.ndarra
     # Topspin implies rotation around Z axis. Right hand rule: forward is +X, up is +Y.
     # Topspin means top of ball moves +X, so rotation is negative around Z.
     omega_vec = np.array([0.0, 0.0, -omega_rad])
+    
+    # Random phase offsets for Karman vortex oscillations (float serve)
+    phi_z = random.uniform(0, 2 * math.pi)
+    phi_y = random.uniform(0, 2 * math.pi)
     
     def derivatives(t: float, state: np.ndarray) -> np.ndarray:
         x, y, z, vx, vy, vz = state
@@ -55,13 +60,15 @@ def solve_trajectory_3d(params: SimulationParams) -> Tuple[np.ndarray, np.ndarra
                 f_lateral = 0.5 * RHO * cl_actual * A_BALL * (v_mag**2) * dir_magnus
                 
         elif params.serve_type == ServeType.FLOAT:
-            # Karman vortex street (oscillating side force)
-            # f = St * v / D
+            # Karman vortex street (oscillating lateral and vertical forces)
+            # Shedding frequency: f = St * v / D
             freq = STROUHAL_NUMBER * v_mag / D_BALL
-            # Simple oscillating force along Z axis
-            cl_float = 0.15 # Arbitrary coefficient for float side force
-            f_z = 0.5 * RHO * cl_float * A_BALL * (v_mag**2) * math.sin(2 * math.pi * freq * t)
-            f_lateral = np.array([0.0, 0.0, f_z])
+            # Two independent oscillating forces with random phase offsets
+            cl_z = 0.15 * math.sin(2 * math.pi * freq * t + phi_z)
+            cl_y = 0.08 * math.sin(2 * math.pi * freq * t + phi_y)
+            f_z = 0.5 * RHO * cl_z * A_BALL * (v_mag**2)
+            f_y = 0.5 * RHO * cl_y * A_BALL * (v_mag**2)
+            f_lateral = np.array([0.0, f_y, f_z])
             
         # Total Force
         f_total = f_drag + f_lateral

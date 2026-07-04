@@ -21,7 +21,7 @@
 Это классический путь для разработчиков:
 ```bash
 # Клонируем проект
-git clone https://github.com/your-username/Math_Model_3D.git
+git clone https://github.com/MOTI-jojo/Math_Model_3D.git
 cd Math_Model_3D
 
 # Создаем виртуальное окружение и ставим зависимости

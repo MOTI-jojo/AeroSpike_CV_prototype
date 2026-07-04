@@ -2,7 +2,6 @@ TEXT = {
     "ru": {
         "page_title": "AeroSpike CV",
         "title": "AeroSpike CV",
-        "lang_toggle": "🇺🇸 Switch to English",
         "subtitle": "### СИМУЛЯТОР ПОЛЁТА ВОЛЕЙБОЛЬНОГО МЯЧА. АЭРОДИНАМИКА.",
         "params": "## ПАРАМЕТРЫ",
         "serve_type": "ТИП ПОДАЧИ",
@@ -48,12 +47,15 @@ TEXT = {
         "an_time_fast": "МОЩНО: Менее 1.2с на реакцию. Очень сложно принять!",
         "an_time_slow": "ПАРАШЮТ: Более 1.5с полета. Легкий мяч для приема.",
         "an_drift_param": "ЭФФЕКТ КАРМАНА",
-        "an_drift_good": "НЕПРЕДСКАЗУЕМО: Отличное смещение планера в воздухе."
+        "an_drift_good": "НЕПРЕДСКАЗУЕМО: Отличное смещение планера в воздухе.",
+        "an_time_normal": "НОРМА: Время полёта 1.2–1.5с. Стандартная подача.",
+        "an_magnus_param": "ЭФФЕКТ МАГНУСА",
+        "an_magnus_strong": "МОЩНО: Вращение эффективно прижимает мяч к полу. Траектория резко падающая.",
+        "an_magnus_weak": "СЛАБО: Вращение недостаточно. Мяч летит по обычной дуге."
     },
     "en": {
         "page_title": "AeroSpike CV",
         "title": "AeroSpike CV",
-        "lang_toggle": "🇷🇺 Переключить на Русский",
         "subtitle": "### VOLLEYBALL FLIGHT SIMULATION. AERODYNAMICS.",
         "params": "## PARAMETERS",
         "serve_type": "SERVE TYPE",
@@ -99,6 +101,10 @@ TEXT = {
         "an_time_fast": "POWERFUL: Less than 1.2s to react. Very hard to receive!",
         "an_time_slow": "SLOW: Over 1.5s flight time. Easy to receive.",
         "an_drift_param": "KARMAN EFFECT",
-        "an_drift_good": "UNPREDICTABLE: Excellent lateral drift."
+        "an_drift_good": "UNPREDICTABLE: Excellent lateral drift.",
+        "an_time_normal": "NORMAL: Flight time 1.2–1.5s. Standard serve.",
+        "an_magnus_param": "MAGNUS EFFECT",
+        "an_magnus_strong": "POWERFUL: Spin effectively pushes the ball down. Sharp falling trajectory.",
+        "an_magnus_weak": "WEAK: Not enough spin. Ball follows a regular arc."
     }
 }

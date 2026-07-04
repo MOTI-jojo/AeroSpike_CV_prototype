@@ -52,11 +52,21 @@ def evaluate_serve(x: np.ndarray, y: np.ndarray, z: np.ndarray, time_arr: np.nda
             results.append({"status": "success", "param": t["an_time_param"], "comment": t["an_time_fast"]})
         elif flight_time > 1.5:
             results.append({"status": "warning", "param": t["an_time_param"], "comment": t["an_time_slow"]})
+        else:
+            results.append({"status": "success", "param": t["an_time_param"], "comment": t["an_time_normal"]})
             
         # 4. Special behaviors
         if serve_type == ServeType.FLOAT:
             max_drift = np.max(np.abs(z))
             if max_drift > 0.3:
                 results.append({"status": "success", "param": t["an_drift_param"], "comment": t["an_drift_good"]})
+        
+        if serve_type == ServeType.TOPSPIN:
+            # Evaluate Magnus effectiveness by comparing max height to initial height
+            max_h = np.max(y)
+            if max_h < y[0] * 1.1:
+                results.append({"status": "success", "param": t["an_magnus_param"], "comment": t["an_magnus_strong"]})
+            else:
+                results.append({"status": "warning", "param": t["an_magnus_param"], "comment": t["an_magnus_weak"]})
                 
     return results

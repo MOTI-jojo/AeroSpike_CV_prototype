@@ -92,3 +92,50 @@ def plot_speed_2d(time_arr: np.ndarray, v: np.ndarray, t: dict) -> go.Figure:
     )
     
     return fig
+
+def plot_monte_carlo(points: list) -> go.Figure:
+    """
+    Plots the landing points of the Monte Carlo simulation on a 2D court representation.
+    """
+    fig = go.Figure()
+    
+    # Extract successes and failures
+    x_succ, z_succ = [], []
+    x_fail, z_fail = [], []
+    
+    for px, pz, is_succ in points:
+        if is_succ:
+            x_succ.append(px)
+            z_succ.append(pz)
+        else:
+            x_fail.append(px)
+            z_fail.append(pz)
+            
+    # Court background (opponent side: x from 9 to 18, z from -4.5 to 4.5)
+    fig.add_shape(type="rect",
+        x0=9, y0=-4.5, x1=18, y1=4.5,
+        line=dict(color="black", width=2),
+        fillcolor="rgba(150, 150, 150, 0.3)"
+    )
+    
+    # Net line
+    fig.add_shape(type="line",
+        x0=9, y0=-4.5, x1=9, y1=4.5,
+        line=dict(color="red", width=4)
+    )
+    
+    # Scatter points
+    if x_succ:
+        fig.add_trace(go.Scatter(x=x_succ, y=z_succ, mode='markers', marker=dict(color='green', size=8), name="Успех"))
+    if x_fail:
+        fig.add_trace(go.Scatter(x=x_fail, y=z_fail, mode='markers', marker=dict(color='red', size=8, symbol='x'), name="Аут/Сетка"))
+        
+    fig.update_layout(
+        title="Монте-Карло: Точки падения (Разброс)",
+        xaxis_title="Длина корта (X, м)",
+        yaxis_title="Ширина корта (Z, м)",
+        xaxis=dict(range=[8, 20]),
+        yaxis=dict(range=[-6, 6]),
+        margin=dict(l=0, r=0, b=0, t=40)
+    )
+    return fig

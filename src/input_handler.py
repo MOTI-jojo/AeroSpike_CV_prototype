@@ -9,6 +9,7 @@ class SimulationParams(BaseModel):
     """
     Validated input parameters for the simulation.
     """
+    ball_type: str = Field(default="MIKASA_V200W", description="Type of the ball from config")
     mass: float = Field(default=0.27, gt=0, description="Mass of the ball in kg")
     
     # Initial conditions

@@ -8,9 +8,11 @@ import numpy as np
 import base64
 from src.input_handler import SimulationParams, ServeType
 from src.physics import solve_trajectory_3d, calculate_impact_force
-from src.visualization import plot_trajectory_3d, plot_speed_2d
+from src.visualization import plot_speed_2d
+from src.component import volleyball_3d
 from src.analyzer import evaluate_serve
 from src.i18n import TEXT
+from src.config import BALL_MODELS
 
 # Select language via session state or default to Russian
 if "lang" not in st.session_state:
@@ -164,10 +166,13 @@ init_state("alpha", 10.0)
 init_state("azimuth", 0.0)
 init_state("y0", 2.5)
 init_state("start_z", 0.0)
+init_state("start_z", 0.0)
 init_state("spin", 800.0)
 init_state("spin_angle", 0.0)
-init_state("mass", 0.27)
-init_state("cd", 0.40)
+if "ball_type" not in st.session_state:
+    st.session_state.ball_type = "MIKASA_V200W"
+init_state("mass", BALL_MODELS["MIKASA_V200W"].mass)
+init_state("cd", BALL_MODELS["MIKASA_V200W"].cd)
 # ------------------------------------------------------ #
 
 # Layout: 2 columns for Main (controls) and Visualization
@@ -178,6 +183,19 @@ with main_col:
     
     serve_type_str = st.selectbox(t["serve_type"], [t["serve_topspin"], t["serve_float"]])
     serve_type = ServeType.TOPSPIN if t["serve_topspin"] == serve_type_str else ServeType.FLOAT
+    
+    st.markdown("Модель мяча") # Add translations later if needed
+    ball_options = list(BALL_MODELS.keys())
+    ball_type = st.selectbox("Мяч", ball_options, index=ball_options.index(st.session_state.ball_type), label_visibility="collapsed")
+    
+    if ball_type != st.session_state.ball_type:
+        st.session_state.ball_type = ball_type
+        if ball_type != "CUSTOM":
+            st.session_state.mass_num = BALL_MODELS[ball_type].mass
+            st.session_state.mass_slider = BALL_MODELS[ball_type].mass
+            st.session_state.cd_num = BALL_MODELS[ball_type].cd
+            st.session_state.cd_slider = BALL_MODELS[ball_type].cd
+        st.rerun()
     
     st.markdown("---")
     
@@ -239,6 +257,7 @@ with main_col:
 
 # Build params
 params = SimulationParams(
+    ball_type=st.session_state.ball_type,
     mass=st.session_state.mass_num,
     v0=st.session_state.v0_num / 3.6,
     alpha_deg=st.session_state.alpha_num,
@@ -272,12 +291,17 @@ try:
         m4.metric(t["force"], f"{impact_force:.1f} {t['unit_n']}")
         
         st.markdown("<br>", unsafe_allow_html=True)
-        fig = plot_trajectory_3d(x, y, z, speed_kmh, t, idx_max_v)
-        st.plotly_chart(fig, use_container_width=True, theme="streamlit")
+        # Using the new React-based 3D Component!
+        volleyball_3d(time_arr, x, y, z, idx_max_v)
         
         st.markdown("<br>", unsafe_allow_html=True)
         fig_speed = plot_speed_2d(time_arr, speed_kmh, t)
         st.plotly_chart(fig_speed, use_container_width=True, theme="streamlit")
+        
+        import pandas as pd
+        df = pd.DataFrame({"Time(s)": time_arr, "X(m)": x, "Y_Height(m)": y, "Z_Width(m)": z, "Speed(km/h)": speed_kmh})
+        csv = df.to_csv(index=False).encode('utf-8')
+        st.download_button("📥 Скачать CSV (Траектория)", csv, "trajectory.csv", "text/csv")
         
         # Аналитика
         st.markdown(f"### {t['an_title']}")
@@ -289,6 +313,50 @@ try:
                 st.error(f"**{res['param']}**: {res['comment']}")
             else:
                 st.warning(f"**{res['param']}**: {res['comment']}")
+                
+        # Продвинутая аналитика (Этап 2)
+        st.markdown("### Цифровой тренер (Продвинутая аналитика)")
+        tab_mc, tab_opt = st.tabs(["Монте-Карло (Стабильность)", "Поиск оптимальной подачи"])
+        
+        with tab_mc:
+            st.write("Симуляция 30 подач со случайными отклонениями (±5% скорости, ±2° угла). Позволяет оценить процент успешного попадания при неидеальном исполнении.")
+            if st.button("Запустить симуляцию Монте-Карло"):
+                from src.analyzer import run_monte_carlo
+                from src.visualization import plot_monte_carlo
+                with st.spinner("Симуляция..."):
+                    success_rate, points = run_monte_carlo(params, n=30)
+                    st.metric("Вероятность попадания (Success Rate)", f"{success_rate:.1f}%")
+                    fig_mc = plot_monte_carlo(points)
+                    st.plotly_chart(fig_mc, use_container_width=True, theme="streamlit")
+                    
+        with tab_opt:
+            st.write("Укажите желаемую точку падения мяча на стороне противника, и алгоритм подберет идеальную скорость и угол.")
+            opt_c1, opt_c2 = st.columns(2)
+            target_x = opt_c1.number_input("Целевой X (длина, 9-18м)", min_value=9.0, max_value=18.0, value=17.0, step=0.5)
+            target_z = opt_c2.number_input("Целевой Z (ширина, от -4.5 до 4.5м)", min_value=-4.5, max_value=4.5, value=4.0, step=0.5)
+            
+            if st.button("Найти параметры"):
+                from src.analyzer import optimize_serve
+                with st.spinner("Алгоритм Nelder-Mead ищет решение..."):
+                    opt_res = optimize_serve(params, target_x, target_z)
+                    if opt_res["success"]:
+                        st.success("Параметры успешно найдены!")
+                        st.write(f"**Скорость:** {opt_res['v0']*3.6:.1f} км/ч")
+                        st.write(f"**Вертикальный угол:** {opt_res['alpha_deg']:.1f}°")
+                        st.write(f"**Горизонтальный азимут:** {opt_res['azimuth_deg']:.1f}°")
+                        
+                        # Apply button
+                        if st.button("Применить эти параметры"):
+                            st.session_state.v0_num = opt_res['v0'] * 3.6
+                            st.session_state.v0_slider = opt_res['v0'] * 3.6
+                            st.session_state.alpha_num = opt_res['alpha_deg']
+                            st.session_state.alpha_slider = opt_res['alpha_deg']
+                            st.session_state.azimuth_num = opt_res['azimuth_deg']
+                            st.session_state.azimuth_slider = opt_res['azimuth_deg']
+                            st.rerun()
+                    else:
+                        st.error("Не удалось найти стабильное решение для заданной точки с текущими параметрами высоты и вращения. Попробуйте изменить точку или базовые настройки.")
 
 except Exception as e:
     st.error(f"{t['error']} {e}")
+

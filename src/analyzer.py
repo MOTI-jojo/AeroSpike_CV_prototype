@@ -76,3 +76,85 @@ def evaluate_serve(x: np.ndarray, y: np.ndarray, z: np.ndarray, time_arr: np.nda
                     results.append({"status": "warning", "param": t["an_magnus_param"], "comment": t["an_magnus_weak"]})
                 
     return results
+
+import copy
+import random
+from typing import Tuple
+
+def run_monte_carlo(params, n=30) -> Tuple[float, List[Tuple[float, float, bool]]]:
+    """
+    Runs N simulations with Gaussian noise on input parameters.
+    Returns the success percentage and a list of landing points (x, z, is_success).
+    """
+    from .physics import solve_trajectory_3d
+    points = []
+    successes = 0
+    
+    for _ in range(n):
+        p = params.copy()
+        p.v0 = params.v0 * random.gauss(1.0, 0.05) # 5% noise on speed
+        p.alpha_deg = params.alpha_deg + random.gauss(0, 2.0) # 2 degrees noise on vertical angle
+        p.azimuth_deg = params.azimuth_deg + random.gauss(0, 1.5) # 1.5 degrees noise on horizontal angle
+        
+        t, x, y, z, vx, vy, vz = solve_trajectory_3d(p)
+        
+        crossed_net = False
+        idx_net = np.where(x >= 9.0)[0]
+        if len(idx_net) > 0 and y[idx_net[0]] > 2.43:
+            crossed_net = True
+            
+        final_x = x[-1]
+        final_z = z[-1]
+        
+        is_success = crossed_net and (9.0 < final_x <= 18.0) and (abs(final_z) <= 4.5)
+        
+        if is_success:
+            successes += 1
+            
+        points.append((final_x, final_z, is_success))
+        
+    return (successes / n) * 100.0, points
+
+def optimize_serve(base_params, target_x: float, target_z: float) -> dict:
+    """
+    Finds optimal v0, alpha, azimuth to hit (target_x, target_z).
+    Returns a dict with the optimal parameters.
+    """
+    from .physics import solve_trajectory_3d
+    from scipy.optimize import minimize
+    
+    def objective(x_vars):
+        v0, alpha, azimuth = x_vars
+        p = base_params.copy()
+        p.v0 = v0
+        p.alpha_deg = alpha
+        p.azimuth_deg = azimuth
+        
+        # Penalize unphysical params
+        if v0 < 10 or v0 > 40: return 1000.0
+        if alpha < -5 or alpha > 45: return 1000.0
+        if azimuth < -30 or azimuth > 30: return 1000.0
+        
+        t, x, y, z, vx, vy, vz = solve_trajectory_3d(p)
+        final_x = x[-1]
+        final_z = z[-1]
+        
+        dist = ((final_x - target_x)**2 + (final_z - target_z)**2)**0.5
+        
+        # Check net
+        idx_net = np.where(x >= 9.0)[0]
+        if len(idx_net) == 0 or y[idx_net[0]] <= 2.43 + 0.105: # net height + ball radius approx
+            dist += 50.0 # Penalty for hitting net
+            
+        return dist
+        
+    initial_guess = [base_params.v0, base_params.alpha_deg, base_params.azimuth_deg]
+    res = minimize(objective, initial_guess, method='Nelder-Mead', options={'maxiter': 40})
+    
+    return {
+        "v0": res.x[0],
+        "alpha_deg": res.x[1],
+        "azimuth_deg": res.x[2],
+        "success": res.fun < 2.0,
+        "dist": res.fun
+    }
